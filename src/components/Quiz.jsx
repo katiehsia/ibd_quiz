@@ -6,13 +6,14 @@ export default function Quiz({ sheetId, title }) {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [selected, setSelected] = useState(null);
-  const [submitted, setSubmitted] = useState(false);
+  const [selectedAnswers, setSelectedAnswers] = useState({});
+  const [submittedAnswers, setSubmittedAnswers] = useState({});
   const [score, setScore] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
 
   const SHEET_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
 
+  // --- Fetch questions from Google Sheet ---
   useEffect(() => {
     fetch(SHEET_URL)
       .then((res) => res.text())
@@ -30,36 +31,60 @@ export default function Quiz({ sheetId, title }) {
       .catch((err) => console.error("Error fetching sheet:", err));
   }, [SHEET_URL]);
 
+  // --- Show confetti only if >80% correct ---
   useEffect(() => {
-    // Turn on confetti when the quiz is done
-    if (currentIndex >= questions.length && questions.length > 0) {
-      setShowConfetti(true);
-      const timer = setTimeout(() => setShowConfetti(false), 6000); // 6s confetti
-      return () => clearTimeout(timer);
+    if (Object.keys(submittedAnswers).length === questions.length && questions.length > 0) {
+      const percent = (score / questions.length) * 100;
+      if (percent > 80) {
+        setShowConfetti(true);
+        const timer = setTimeout(() => setShowConfetti(false), 6000);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [currentIndex, questions.length]);
+  }, [score, questions.length, submittedAnswers]);
 
   if (loading)
     return <p style={{ textAlign: "center" }}>Loading questions...</p>;
   if (questions.length === 0) return <p>No questions found.</p>;
 
   const current = questions[currentIndex];
-  const quizDone = currentIndex >= questions.length;
+  const quizDone = Object.keys(submittedAnswers).length === questions.length;
 
-  const handleSelect = (option) => !submitted && setSelected(option);
+  const selected = selectedAnswers[currentIndex];
+  const submitted = submittedAnswers[currentIndex];
 
-  const handleSubmit = () => {
-    if (selected) {
-      setSubmitted(true);
-      if (selected === current.correct) setScore((s) => s + 1);
+  // --- Handle selecting an option ---
+  const handleSelect = (option) => {
+    if (!submitted) {
+      setSelectedAnswers({ ...selectedAnswers, [currentIndex]: option });
     }
   };
 
-  const handleNext = () => {
-    setSelected(null);
-    setSubmitted(false);
-    setCurrentIndex((i) => i + 1);
+  // --- Handle submitting an answer ---
+  const handleSubmit = () => {
+    if (selected && !submitted) {
+      const correct = current.correct;
+      const isCorrect = selected === correct;
+      setSubmittedAnswers({ ...submittedAnswers, [currentIndex]: true });
+      if (isCorrect) setScore((s) => s + 1);
+    }
   };
+
+  // --- Navigation buttons ---
+  const handleNext = () => {
+    if (currentIndex < questions.length - 1) {
+      setCurrentIndex((i) => i + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex((i) => i - 1);
+    }
+  };
+
+  // --- Compute overall score after completion ---
+  const totalQuestions = questions.length;
 
   return (
     <div style={styles.container}>
@@ -70,11 +95,11 @@ export default function Quiz({ sheetId, title }) {
         <>
           <h2>{title}</h2>
           <p style={styles.score}>
-            Score: <strong>{score}</strong> / {questions.length}
+            Score: <strong>{score}</strong> / {totalQuestions}
           </p>
 
           <h3 style={styles.question}>
-            Question {currentIndex + 1} of {questions.length}
+            Question {currentIndex + 1} of {totalQuestions}
           </h3>
           <p style={styles.text}>{current.text}</p>
 
@@ -102,19 +127,67 @@ export default function Quiz({ sheetId, title }) {
             ))}
           </div>
 
-          {!submitted ? (
+          {/* Navigation & Submit */}
+          <div style={styles.navButtons}>
+            {/* Previous */}
             <button
-              onClick={handleSubmit}
-              disabled={!selected}
-              style={{ ...styles.submit, opacity: !selected ? 0.6 : 1 }}
+              onClick={handlePrevious}
+              disabled={currentIndex === 0}
+              style={{
+                ...styles.nav,
+                opacity: currentIndex === 0 ? 0.6 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (currentIndex > 0) e.target.style.backgroundColor = "#757575"; // darker gray
+              }}
+              onMouseLeave={(e) => {
+                if (currentIndex > 0) e.target.style.backgroundColor = "#9E9E9E"; // reset gray
+              }}
             >
-              Submit
+              ⬅️ Previous
             </button>
-          ) : (
-            <button onClick={handleNext} style={styles.next}>
-              Next
-            </button>
-          )}
+
+            {/* Submit or Next */}
+            {!submitted ? (
+              <button
+                onClick={handleSubmit}
+                disabled={!selected}
+                style={{
+                  ...styles.submit,
+                  opacity: !selected ? 0.6 : 1,
+                  backgroundColor: !selected ? "#a5d6a7" : "#4CAF50",
+                }}
+                onMouseEnter={(e) => {
+                  if (selected) e.target.style.backgroundColor = "#43A047"; // darker green
+                }}
+                onMouseLeave={(e) => {
+                  if (selected) e.target.style.backgroundColor = "#4CAF50"; // reset
+                }}
+              >
+                Submit
+              </button>
+            ) : (
+              <button
+                onClick={handleNext}
+                disabled={currentIndex === questions.length - 1}
+                style={{
+                  ...styles.next,
+                  opacity: currentIndex === questions.length - 1 ? 0.6 : 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (currentIndex < questions.length - 1)
+                    e.target.style.backgroundColor = "#FB8C00"; // darker orange
+                }}
+                onMouseLeave={(e) => {
+                  if (currentIndex < questions.length - 1)
+                    e.target.style.backgroundColor = "#FF9800"; // reset orange
+                }}
+              >
+                Next ➡️
+              </button>
+            )}
+          </div>
+
 
           {submitted && (
             <>
@@ -133,10 +206,10 @@ export default function Quiz({ sheetId, title }) {
         <div style={styles.complete}>
           <h2>🎉 Quiz Complete!</h2>
           <p>
-            You scored <strong>{score}</strong> out of {questions.length}.
+            You scored <strong>{score}</strong> out of {totalQuestions}.
           </p>
           <Link to="/" style={styles.returnHome}>
-            ⬅️ Return to Home
+            🏠 Return to Home
           </Link>
         </div>
       )}
@@ -144,7 +217,7 @@ export default function Quiz({ sheetId, title }) {
   );
 }
 
-// --- Inline CSS styles ---
+// --- Inline CSS ---
 const styles = {
   container: {
     display: "flex",
@@ -157,8 +230,6 @@ const styles = {
     fontFamily: "sans-serif",
     backgroundColor: "#f9f9f9",
     padding: "1rem",
-    boxSizing: "border-box",
-    margin: 0,
     position: "relative",
     overflow: "hidden",
   },
@@ -172,18 +243,9 @@ const styles = {
     padding: "0.4rem 0.8rem",
     borderRadius: "6px",
   },
-  score: {
-    marginBottom: "1.5rem",
-    fontSize: "1.1rem",
-  },
-  question: {
-    marginBottom: "0.5rem",
-  },
-  text: {
-    fontSize: "1.2rem",
-    marginBottom: "1.5rem",
-    maxWidth: "600px",
-  },
+  score: { marginBottom: "1.5rem", fontSize: "1.1rem" },
+  question: { marginBottom: "0.5rem" },
+  text: { fontSize: "1.2rem", marginBottom: "1.5rem", maxWidth: "600px" },
   options: {
     display: "flex",
     flexDirection: "column",
@@ -199,9 +261,14 @@ const styles = {
     cursor: "pointer",
     transition: "0.2s ease",
   },
-  submit: {
+  navButtons: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "1rem",
     marginTop: "1.5rem",
-    backgroundColor: "#2196F3",
+  },
+  nav: {
+    backgroundColor: "#9E9E9E",
     color: "white",
     border: "none",
     padding: "0.75rem 2rem",
@@ -209,8 +276,17 @@ const styles = {
     fontSize: "1rem",
     cursor: "pointer",
   },
+  submit: {
+    backgroundColor: "#4CAF50", // base green
+    color: "white",
+    border: "none",
+    padding: "0.75rem 2rem",
+    borderRadius: "8px",
+    fontSize: "1rem",
+    cursor: "pointer",
+    transition: "background-color 0.2s ease",
+  },
   next: {
-    marginTop: "1.5rem",
     backgroundColor: "#FF9800",
     color: "white",
     border: "none",
@@ -219,10 +295,7 @@ const styles = {
     fontSize: "1rem",
     cursor: "pointer",
   },
-  feedback: {
-    marginTop: "1rem",
-    fontSize: "1.1rem",
-  },
+  feedback: { marginTop: "1rem", fontSize: "1.1rem" },
   explanation: {
     marginTop: "0.75rem",
     fontSize: "1rem",
@@ -242,7 +315,6 @@ const styles = {
     backgroundColor: "#e8f5e9",
     textAlign: "center",
     padding: "2rem",
-    boxSizing: "border-box",
   },
   returnHome: {
     marginTop: "1.5rem",

@@ -5,14 +5,35 @@ import { MODULES } from "./data/modules";
 function Home() {
   return (
     <div style={styles.home}>
-      <h1>Medical Quiz Hub</h1>
-      <p>Select a module:</p>
-      <div style={styles.modules}>
+      <h1>Dr. Jangi's IBD Learning Home</h1>
+
+      <div style={styles.buttonContainer}>
+        {/* Pre Survey */}
+        <a 
+          href="https://google.com" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          style={styles.surveyButton}
+        >
+          Pre Survey
+        </a>
+
+        {/* Quiz Modules */}
         {MODULES.map((m) => (
           <Link key={m.id} to={`/quiz/${m.id}`} style={styles.moduleButton}>
             {m.name}
           </Link>
         ))}
+
+        {/* Post Survey */}
+        <a 
+          href="https://example.com/postsurvey" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          style={styles.surveyButton}
+        >
+          Post Survey
+        </a>
       </div>
     </div>
   );
@@ -46,20 +67,35 @@ const styles = {
     backgroundColor: "#f5f5f5",
     textAlign: "center",
     fontFamily: "sans-serif",
+    padding: "2rem",
   },
-  modules: {
+  buttonContainer: {
     display: "flex",
     flexDirection: "column",
-    gap: "1rem",
-    marginTop: "1.5rem",
+    alignItems: "center",
+    gap: "1.2rem", // ✅ ensures equal spacing between all buttons
+    marginTop: "2rem",
   },
   moduleButton: {
-    backgroundColor: "#2196F3",
+    backgroundColor: "#2196F3", // blue for module buttons
     color: "white",
     textDecoration: "none",
     padding: "0.75rem 2rem",
     borderRadius: "8px",
     fontSize: "1.1rem",
     transition: "background-color 0.2s",
+    width: "220px",
+    textAlign: "center",
+  },
+  surveyButton: {
+    backgroundColor: "#20c997", // teal for pre/post survey buttons
+    color: "white",
+    textDecoration: "none",
+    padding: "0.75rem 2rem",
+    borderRadius: "8px",
+    fontSize: "1.1rem",
+    transition: "background-color 0.2s",
+    width: "220px",
+    textAlign: "center",
   },
 };
