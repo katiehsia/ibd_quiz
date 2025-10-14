@@ -13,7 +13,17 @@ export default function Quiz({ sheetId, title }) {
 
   const SHEET_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
 
-  // --- Fetch questions from Google Sheet ---
+  // --- Shuffle helper ---
+  const shuffleArray = (array) => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
+
+  // --- Fetch and randomize questions ---
   useEffect(() => {
     fetch(SHEET_URL)
       .then((res) => res.text())
@@ -25,13 +35,21 @@ export default function Quiz({ sheetId, title }) {
           correct: r.c[5]?.v,
           explanation: r.c[6]?.v || "",
         }));
-        setQuestions(rows);
+
+        const randomizedQuestions = shuffleArray(
+          rows.map((q) => ({
+            ...q,
+            options: shuffleArray(q.options),
+          }))
+        );
+
+        setQuestions(randomizedQuestions);
         setLoading(false);
       })
       .catch((err) => console.error("Error fetching sheet:", err));
   }, [SHEET_URL]);
 
-  // --- Show confetti only if >80% correct ---
+  // --- Show confetti if >80% correct ---
   useEffect(() => {
     if (Object.keys(submittedAnswers).length === questions.length && questions.length > 0) {
       const percent = (score / questions.length) * 100;
@@ -44,33 +62,29 @@ export default function Quiz({ sheetId, title }) {
   }, [score, questions.length, submittedAnswers]);
 
   if (loading)
-    return <p style={{ textAlign: "center" }}>Loading questions...</p>;
+    return <p style={{ textAlign: "center", marginTop: "3rem" }}>Loading questions...</p>;
   if (questions.length === 0) return <p>No questions found.</p>;
 
   const current = questions[currentIndex];
   const quizDone = Object.keys(submittedAnswers).length === questions.length;
-
   const selected = selectedAnswers[currentIndex];
   const submitted = submittedAnswers[currentIndex];
+  const totalQuestions = questions.length;
 
-  // --- Handle selecting an option ---
   const handleSelect = (option) => {
     if (!submitted) {
       setSelectedAnswers({ ...selectedAnswers, [currentIndex]: option });
     }
   };
 
-  // --- Handle submitting an answer ---
   const handleSubmit = () => {
     if (selected && !submitted) {
-      const correct = current.correct;
-      const isCorrect = selected === correct;
+      const isCorrect = selected === current.correct;
       setSubmittedAnswers({ ...submittedAnswers, [currentIndex]: true });
       if (isCorrect) setScore((s) => s + 1);
     }
   };
 
-  // --- Navigation buttons ---
   const handleNext = () => {
     if (currentIndex < questions.length - 1) {
       setCurrentIndex((i) => i + 1);
@@ -83,22 +97,30 @@ export default function Quiz({ sheetId, title }) {
     }
   };
 
-  // --- Compute overall score after completion ---
-  const totalQuestions = questions.length;
-
   return (
     <div style={styles.container}>
-      <Link to="/" style={styles.homeLink}>🏠 Home</Link>
       {showConfetti && <Confetti recycle={false} numberOfPieces={300} />}
+
+      {/* --- Header --- */}
+      <div style={styles.header}>
+        <div style={styles.sideColumn}>
+          <Link to="/" style={styles.homeLink}>
+            🏠 Home
+          </Link>
+        </div>
+        <div style={styles.centerColumn}>
+          <h2 style={styles.title}>{title}</h2>
+        </div>
+        <div style={styles.sideColumn}>{/* Empty for symmetry */}</div>
+      </div>
 
       {!quizDone ? (
         <>
-          <h2>{title}</h2>
           <p style={styles.score}>
             Score: <strong>{score}</strong> / {totalQuestions}
           </p>
 
-          <h3 style={styles.question}>
+          <h3 style={styles.questionHeader}>
             Question {currentIndex + 1} of {totalQuestions}
           </h3>
           <p style={styles.text}>{current.text}</p>
@@ -129,7 +151,6 @@ export default function Quiz({ sheetId, title }) {
 
           {/* Navigation & Submit */}
           <div style={styles.navButtons}>
-            {/* Previous */}
             <button
               onClick={handlePrevious}
               disabled={currentIndex === 0}
@@ -137,17 +158,10 @@ export default function Quiz({ sheetId, title }) {
                 ...styles.nav,
                 opacity: currentIndex === 0 ? 0.6 : 1,
               }}
-              onMouseEnter={(e) => {
-                if (currentIndex > 0) e.target.style.backgroundColor = "#757575"; // darker gray
-              }}
-              onMouseLeave={(e) => {
-                if (currentIndex > 0) e.target.style.backgroundColor = "#9E9E9E"; // reset gray
-              }}
             >
               ⬅️ Previous
             </button>
 
-            {/* Submit or Next */}
             {!submitted ? (
               <button
                 onClick={handleSubmit}
@@ -155,13 +169,6 @@ export default function Quiz({ sheetId, title }) {
                 style={{
                   ...styles.submit,
                   opacity: !selected ? 0.6 : 1,
-                  backgroundColor: !selected ? "#a5d6a7" : "#4CAF50",
-                }}
-                onMouseEnter={(e) => {
-                  if (selected) e.target.style.backgroundColor = "#43A047"; // darker green
-                }}
-                onMouseLeave={(e) => {
-                  if (selected) e.target.style.backgroundColor = "#4CAF50"; // reset
                 }}
               >
                 Submit
@@ -174,20 +181,11 @@ export default function Quiz({ sheetId, title }) {
                   ...styles.next,
                   opacity: currentIndex === questions.length - 1 ? 0.6 : 1,
                 }}
-                onMouseEnter={(e) => {
-                  if (currentIndex < questions.length - 1)
-                    e.target.style.backgroundColor = "#FB8C00"; // darker orange
-                }}
-                onMouseLeave={(e) => {
-                  if (currentIndex < questions.length - 1)
-                    e.target.style.backgroundColor = "#FF9800"; // reset orange
-                }}
               >
                 Next ➡️
               </button>
             )}
           </div>
-
 
           {submitted && (
             <>
@@ -217,34 +215,54 @@ export default function Quiz({ sheetId, title }) {
   );
 }
 
-// --- Inline CSS ---
+// --- Styles ---
 const styles = {
   container: {
     display: "flex",
     flexDirection: "column",
-    justifyContent: "center",
     alignItems: "center",
     minHeight: "100vh",
     width: "100%",
     textAlign: "center",
     fontFamily: "sans-serif",
     backgroundColor: "#f9f9f9",
-    padding: "1rem",
-    position: "relative",
-    overflow: "hidden",
+    padding: "2rem 1rem 4rem 1rem",
+    boxSizing: "border-box",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+    maxWidth: "800px",
+    marginBottom: "1.5rem",
+  },
+  sideColumn: {
+    flex: "1 1 100px",
+    display: "flex",
+    justifyContent: "flex-start",
+  },
+  centerColumn: {
+    flex: "2 1 100%",
+    display: "flex",
+    justifyContent: "center",
   },
   homeLink: {
-    position: "absolute",
-    top: "20px",
-    left: "20px",
-    textDecoration: "none",
     backgroundColor: "#ddd",
     color: "black",
+    textDecoration: "none",
     padding: "0.4rem 0.8rem",
     borderRadius: "6px",
+    fontSize: "0.95rem",
+    fontWeight: "500",
+  },
+  title: {
+    margin: 0,
+    fontSize: "1.8rem",
+    fontWeight: "600",
   },
   score: { marginBottom: "1.5rem", fontSize: "1.1rem" },
-  question: { marginBottom: "0.5rem" },
+  questionHeader: { marginBottom: "0.5rem" },
   text: { fontSize: "1.2rem", marginBottom: "1.5rem", maxWidth: "600px" },
   options: {
     display: "flex",
@@ -266,6 +284,8 @@ const styles = {
     justifyContent: "space-between",
     gap: "1rem",
     marginTop: "1.5rem",
+    maxWidth: "400px",
+    width: "100%",
   },
   nav: {
     backgroundColor: "#9E9E9E",
@@ -277,7 +297,7 @@ const styles = {
     cursor: "pointer",
   },
   submit: {
-    backgroundColor: "#4CAF50", // base green
+    backgroundColor: "#4CAF50",
     color: "white",
     border: "none",
     padding: "0.75rem 2rem",
