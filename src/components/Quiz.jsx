@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Confetti from "react-confetti";
-import mountainImage from "../assets/mountain.jpg"; // ✅ local image
+import mountainImage from "../assets/mountain.jpg"; // ✅ local background image
 
 export default function Quiz({ sheetId, title }) {
   const [questions, setQuestions] = useState([]);
@@ -10,11 +10,35 @@ export default function Quiz({ sheetId, title }) {
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [submittedAnswers, setSubmittedAnswers] = useState({});
   const [score, setScore] = useState(0);
+  const [showResults, setShowResults] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
 
+  const navigate = useNavigate();
   const SHEET_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
 
-  // --- Shuffle helper ---
+  // --- Fetch questions ---
+  useEffect(() => {
+    fetch(SHEET_URL)
+      .then((res) => res.text())
+      .then((text) => {
+        const json = JSON.parse(text.substr(47).slice(0, -2));
+        const rows = json.table.rows.map((r) =>
+          r.c.map((cell) => (cell ? cell.v : ""))
+        );
+        const formatted = rows.map(
+          ([question, optA, optB, optC, optD, correct, explanation]) => ({
+            question,
+            options: shuffleArray([optA, optB, optC, optD]),
+            correct,
+            explanation,
+          })
+        );
+        setQuestions(formatted);
+        setLoading(false);
+      })
+      .catch((err) => console.error("Error loading sheet:", err));
+  }, [SHEET_URL]);
+
   const shuffleArray = (array) => {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -24,51 +48,44 @@ export default function Quiz({ sheetId, title }) {
     return shuffled;
   };
 
-  // --- Fetch questions from Google Sheet ---
-  useEffect(() => {
-    fetch(SHEET_URL)
-      .then((res) => res.text())
-      .then((text) => {
-        const json = JSON.parse(text.substr(47).slice(0, -2));
-        const rows = json.table.rows.map((r) =>
-          r.c.map((cell) => (cell ? cell.v : ""))
-        );
-        const formatted = rows.map(([question, optA, optB, optC, optD, correct]) => ({
-          question,
-          options: shuffleArray([optA, optB, optC, optD]),
-          correct,
-        }));
-        setQuestions(formatted);
-        setLoading(false);
-      })
-      .catch((err) => console.error("Error loading sheet:", err));
-  }, [SHEET_URL]);
+  if (loading) return <p style={{ color: "white" }}>Loading questions...</p>;
+
+  const total = questions.length;
+  const current = questions[currentIndex];
+  const selected = selectedAnswers[currentIndex];
+  const submitted = submittedAnswers[currentIndex];
 
   const handleSelect = (answer) => {
-    setSelectedAnswers({ ...selectedAnswers, [currentIndex]: answer });
-  };
-
-  const handleSubmit = () => {
-    const currentQuestion = questions[currentIndex];
-    const selected = selectedAnswers[currentIndex];
-    if (!selected) return;
-
-    const isCorrect = selected === currentQuestion.correct;
-    const updated = { ...submittedAnswers, [currentIndex]: selected };
-    setSubmittedAnswers(updated);
-    setScore((prev) => prev + (isCorrect ? 1 : 0));
-
-    if (currentIndex + 1 < questions.length) {
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      setShowConfetti(true);
+    if (!submitted) {
+      setSelectedAnswers({ ...selectedAnswers, [currentIndex]: answer });
     }
   };
 
-  if (loading) return <p style={{ color: "white" }}>Loading questions...</p>;
+  const handleSubmitAnswer = () => {
+    if (!selected) return;
+    const isCorrect = selected === current.correct;
+    if (!submittedAnswers[currentIndex]) {
+      setSubmittedAnswers({
+        ...submittedAnswers,
+        [currentIndex]: { selected, isCorrect },
+      });
+      if (isCorrect) setScore((prev) => prev + 1);
+    }
+  };
 
-  const current = questions[currentIndex];
-  const total = questions.length;
+  const handleNext = () => {
+    if (currentIndex < total - 1) setCurrentIndex(currentIndex + 1);
+  };
+
+  const handlePrev = () => {
+    if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
+  };
+
+  const handleFinish = () => {
+    const percent = (score / total) * 100;
+    if (percent >= 80) setShowConfetti(true);
+    setShowResults(true);
+  };
 
   return (
     <div style={styles.container}>
@@ -90,43 +107,105 @@ export default function Quiz({ sheetId, title }) {
         {showConfetti && <Confetti />}
         <h1 style={styles.title}>{title}</h1>
 
-        {!showConfetti ? (
-          <div style={styles.quizBox}>
-            <h2 style={styles.question}>{current.question}</h2>
-            <div style={styles.optionsContainer}>
-              {current.options.map((opt, i) => (
-                <button
-                  key={i}
-                  style={{
-                    ...styles.optionButton,
-                    backgroundColor:
-                      selectedAnswers[currentIndex] === opt
-                        ? "rgba(255,255,255,0.25)"
-                        : "rgba(255,255,255,0.1)",
-                  }}
-                  onClick={() => handleSelect(opt)}
-                >
-                  {opt}
-                </button>
-              ))}
-            </div>
-            <button style={styles.submitButton} onClick={handleSubmit}>
-              {currentIndex + 1 === total ? "Finish Quiz" : "Next"}
-            </button>
-            <p style={styles.progress}>
-              Question {currentIndex + 1} / {total}
-            </p>
-          </div>
-        ) : (
+        {/* --- Final Results Page --- */}
+        {showResults ? (
           <div style={styles.results}>
-            <h2>Quiz Complete! 🎉</h2>
+            <h2>Quiz Complete 🎉</h2>
             <p>
               Your score: {score} / {total} (
               {Math.round((score / total) * 100)}%)
             </p>
-            <Link to="/" style={styles.restartButton}>
+            <Link to="/" style={styles.homeReturnButton}>
               Back to Home
             </Link>
+          </div>
+        ) : (
+          /* --- Question-by-question view --- */
+          <div style={styles.quizBox}>
+            <h2 style={styles.question}>{current.question}</h2>
+
+            <div style={styles.optionsContainer}>
+              {current.options.map((opt, i) => {
+                const isSelected = selected === opt;
+                const isCorrectAnswer = current.correct === opt;
+                const isSubmitted = !!submitted;
+                let background = "rgba(255,255,255,0.1)";
+
+                if (isSubmitted) {
+                  if (isCorrectAnswer) background = "rgba(76, 175, 80, 0.4)";
+                  else if (isSelected) background = "rgba(244, 67, 54, 0.4)";
+                } else if (isSelected) {
+                  background = "rgba(255,255,255,0.25)";
+                }
+
+                return (
+                  <button
+                    key={i}
+                    style={{ ...styles.optionButton, backgroundColor: background }}
+                    onClick={() => handleSelect(opt)}
+                    disabled={isSubmitted}
+                  >
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* --- Buttons --- */}
+            <div style={styles.navButtons}>
+              <button
+                style={{
+                  ...styles.navButton,
+                  opacity: currentIndex === 0 ? 0.5 : 1,
+                }}
+                disabled={currentIndex === 0}
+                onClick={handlePrev}
+              >
+                ⬅ Prev
+              </button>
+
+              {!submitted ? (
+                <button
+                  style={{
+                    ...styles.submitButton,
+                    opacity: selected ? 1 : 0.5,
+                  }}
+                  onClick={handleSubmitAnswer}
+                  disabled={!selected}
+                >
+                  Submit Answer
+                </button>
+              ) : currentIndex === total - 1 ? (
+                <button style={styles.finishButton} onClick={handleFinish}>
+                  Finish Quiz 🎯
+                </button>
+              ) : (
+                <button style={styles.navButton} onClick={handleNext}>
+                  Next ➡
+                </button>
+              )}
+            </div>
+
+            {/* --- Explanation --- */}
+            {submitted && (
+              <div style={styles.explanationBox}>
+                <p>
+                  {submitted.isCorrect ? "✅ Correct!" : "❌ Incorrect."}
+                </p>
+                <p>
+                  <strong>Correct answer:</strong> {current.correct}
+                </p>
+                {current.explanation && (
+                  <p style={{ marginTop: "0.5rem" }}>
+                    <strong>Explanation:</strong> {current.explanation}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <p style={styles.progress}>
+              Question {currentIndex + 1} / {total}
+            </p>
           </div>
         )}
       </div>
@@ -134,8 +213,8 @@ export default function Quiz({ sheetId, title }) {
   );
 }
 
+// --- Styles ---
 const styles = {
-  // --- Overall container ---
   container: {
     position: "relative",
     display: "flex",
@@ -148,8 +227,6 @@ const styles = {
     color: "#fff",
     textShadow: "0 1px 3px rgba(0,0,0,0.7)",
   },
-
-  // --- Background + overlay ---
   background: {
     position: "absolute",
     top: 0,
@@ -167,11 +244,22 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.35)", // adjustable for transparency
+    backgroundColor: "rgba(0,0,0,0.35)",
     zIndex: 1,
   },
-
-  // --- Content centering ---
+  homeButton: {
+    position: "fixed",
+    top: "1rem",
+    left: "1rem",
+    textDecoration: "none",
+    color: "#fff",
+    fontWeight: "bold",
+    background: "rgba(0,0,0,0.4)",
+    padding: "0.6rem 1rem",
+    borderRadius: "8px",
+    zIndex: 3,
+    fontSize: "clamp(0.8rem, 2.5vw, 1rem)",
+  },
   content: {
     position: "relative",
     zIndex: 2,
@@ -185,51 +273,26 @@ const styles = {
     boxSizing: "border-box",
     textAlign: "center",
   },
-
-  // --- Fixed home button (always top left) ---
-  homeButton: {
-    position: "fixed",
-    top: "1rem",
-    left: "1rem",
-    textDecoration: "none",
-    color: "#fff",
-    fontWeight: "bold",
-    background: "rgba(0,0,0,0.4)",
-    padding: "0.6rem 1rem",
-    borderRadius: "8px",
-    zIndex: 3,
-    fontSize: "clamp(0.8rem, 2.5vw, 1rem)",
-    transition: "background 0.3s",
-  },
-
-  // --- Title ---
   title: {
     marginBottom: "1rem",
     fontSize: "clamp(1.5rem, 5vw, 2.5rem)",
-    lineHeight: 1.2,
   },
-
-  // --- Quiz box centered ---
   quizBox: {
     background: "rgba(0, 0, 0, 0.55)",
     borderRadius: "12px",
     padding: "clamp(1rem, 4vw, 2rem)",
     width: "100%",
-    maxWidth: "600px",
     boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
   },
-
   question: {
     fontSize: "clamp(1rem, 4vw, 1.3rem)",
     marginBottom: "1rem",
   },
-
   optionsContainer: {
     display: "flex",
     flexDirection: "column",
     gap: "0.75rem",
   },
-
   optionButton: {
     border: "none",
     borderRadius: "8px",
@@ -240,37 +303,61 @@ const styles = {
     transition: "background 0.3s, transform 0.1s",
     fontSize: "clamp(0.9rem, 3vw, 1rem)",
   },
-
-  submitButton: {
+  navButtons: {
+    display: "flex",
+    justifyContent: "space-between",
     marginTop: "1.5rem",
-    backgroundColor: "#4CAF50",
+  },
+  navButton: {
+    backgroundColor: "#2196F3",
     border: "none",
     color: "white",
-    padding: "clamp(0.75rem, 2.5vw, 1rem) 1.5rem",
+    padding: "0.75rem 1.25rem",
     borderRadius: "8px",
     cursor: "pointer",
     fontWeight: "bold",
-    transition: "background-color 0.3s",
+  },
+  submitButton: {
+    backgroundColor: "#4CAF50",
+    border: "none",
+    color: "white",
+    padding: "0.75rem 1.25rem",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontWeight: "bold",
+  },
+  finishButton: {
+    backgroundColor: "#FF9800",
+    border: "none",
+    color: "white",
+    padding: "0.75rem 1.25rem",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontWeight: "bold",
+  },
+  explanationBox: {
+    marginTop: "1.5rem",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    padding: "1rem",
+    borderRadius: "8px",
     fontSize: "clamp(0.9rem, 3vw, 1rem)",
   },
-
   progress: {
     marginTop: "1rem",
     fontSize: "clamp(0.85rem, 3vw, 1rem)",
   },
-
   results: {
     background: "rgba(0,0,0,0.5)",
     borderRadius: "12px",
     padding: "clamp(1rem, 4vw, 2rem)",
-    maxWidth: "600px",
-    margin: "0 auto",
+    width: "100%",
+    maxWidth: "700px",
+    boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
   },
-
-  restartButton: {
+  homeReturnButton: {
     display: "inline-block",
     marginTop: "1.5rem",
-    backgroundColor: "#4CAF50",
+    backgroundColor: "#2196F3",
     color: "#fff",
     padding: "clamp(0.75rem, 2.5vw, 1rem) 1.5rem",
     borderRadius: "8px",
