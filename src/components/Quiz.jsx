@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import Confetti from "react-confetti";
-import mountainImage from "../assets/mountain.jpg"; // ✅ local background image
+import mountainImage from "../assets/mountain.jpg";
+import hikerImage from "../assets/hiker.png"; // ✅ hiker image
 
 export default function Quiz({ sheetId, title }) {
   const [questions, setQuestions] = useState([]);
@@ -12,8 +13,8 @@ export default function Quiz({ sheetId, title }) {
   const [score, setScore] = useState(0);
   const [showResults, setShowResults] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [progressFraction, setProgressFraction] = useState(0); // controls hiker movement
 
-  const navigate = useNavigate();
   const SHEET_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
 
   // --- Fetch questions ---
@@ -55,41 +56,58 @@ export default function Quiz({ sheetId, title }) {
   const selected = selectedAnswers[currentIndex];
   const submitted = submittedAnswers[currentIndex];
 
+  // --- Handle select and submit ---
   const handleSelect = (answer) => {
-    if (!submitted) {
-      setSelectedAnswers({ ...selectedAnswers, [currentIndex]: answer });
-    }
+    if (!submitted) setSelectedAnswers({ ...selectedAnswers, [currentIndex]: answer });
   };
 
   const handleSubmitAnswer = () => {
     if (!selected) return;
     const isCorrect = selected === current.correct;
+
     if (!submittedAnswers[currentIndex]) {
       setSubmittedAnswers({
         ...submittedAnswers,
         [currentIndex]: { selected, isCorrect },
       });
-      if (isCorrect) setScore((prev) => prev + 1);
+
+      // ✅ Move hiker after submission (only if correct)
+      if (isCorrect) {
+        const newScore = score + 1;
+        setScore(newScore);
+        setTimeout(() => {
+          setProgressFraction(newScore / total);
+        }, 400);
+      }
     }
   };
 
   const handleNext = () => {
     if (currentIndex < total - 1) setCurrentIndex(currentIndex + 1);
   };
-
   const handlePrev = () => {
     if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
   };
-
   const handleFinish = () => {
     const percent = (score / total) * 100;
     if (percent >= 80) setShowConfetti(true);
     setShowResults(true);
   };
 
+  // --- Hiker movement ---
+  // Start: bottom-left (x = small offset, y = small offset)
+  // End: horizontally centered, slightly below top (fully visible)
+  const startX = 5; // % from left edge
+  const endX = 50; // % (center)
+  const startY = 5; // % from bottom edge
+  const endY = 85; // % up from bottom (top area but still visible)
+
+  const hikerX = startX + (endX - startX) * progressFraction;
+  const hikerY = startY + (endY - startY) * progressFraction;
+
   return (
     <div style={styles.container}>
-      {/* Background and overlay */}
+      {/* Fixed background */}
       <div
         style={{
           ...styles.background,
@@ -98,29 +116,38 @@ export default function Quiz({ sheetId, title }) {
       />
       <div style={styles.overlay} />
 
+      {/* ✅ Hiker (fixed to screen, always fully visible) */}
+      <img
+        src={hikerImage}
+        alt="hiker"
+        style={{
+          ...styles.hiker,
+          left: `${hikerX}%`,
+          bottom: `${hikerY}%`,
+        }}
+      />
+
       {/* Fixed Home Button */}
       <Link to="/" style={styles.homeButton}>
         ⬅ Home
       </Link>
 
+      {/* Foreground Quiz */}
       <div style={styles.content}>
         {showConfetti && <Confetti />}
         <h1 style={styles.title}>{title}</h1>
 
-        {/* --- Final Results Page --- */}
         {showResults ? (
           <div style={styles.results}>
             <h2>Quiz Complete 🎉</h2>
             <p>
-              Your score: {score} / {total} (
-              {Math.round((score / total) * 100)}%)
+              Your score: {score} / {total} ({Math.round((score / total) * 100)}%)
             </p>
             <Link to="/" style={styles.homeReturnButton}>
               Back to Home
             </Link>
           </div>
         ) : (
-          /* --- Question-by-question view --- */
           <div style={styles.quizBox}>
             <h2 style={styles.question}>{current.question}</h2>
 
@@ -151,7 +178,7 @@ export default function Quiz({ sheetId, title }) {
               })}
             </div>
 
-            {/* --- Buttons --- */}
+            {/* Navigation Buttons */}
             <div style={styles.navButtons}>
               <button
                 style={{
@@ -186,12 +213,10 @@ export default function Quiz({ sheetId, title }) {
               )}
             </div>
 
-            {/* --- Explanation --- */}
+            {/* Explanation */}
             {submitted && (
               <div style={styles.explanationBox}>
-                <p>
-                  {submitted.isCorrect ? "✅ Correct!" : "❌ Incorrect."}
-                </p>
+                <p>{submitted.isCorrect ? "✅ Correct!" : "❌ Incorrect."}</p>
                 <p>
                   <strong>Correct answer:</strong> {current.correct}
                 </p>
@@ -217,35 +242,40 @@ export default function Quiz({ sheetId, title }) {
 const styles = {
   container: {
     position: "relative",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    minHeight: "100vh",
-    width: "100%",
-    overflowX: "hidden",
+    width: "100vw",
+    height: "100vh",
+    overflow: "hidden",
     fontFamily: "sans-serif",
     color: "#fff",
     textShadow: "0 1px 3px rgba(0,0,0,0.7)",
   },
   background: {
-    position: "absolute",
+    position: "fixed",
     top: 0,
     left: 0,
-    right: 0,
-    bottom: 0,
+    width: "100vw",
+    height: "100vh",
     backgroundSize: "cover",
     backgroundPosition: "center",
-    backgroundAttachment: "fixed",
     zIndex: 0,
   },
   overlay: {
-    position: "absolute",
+    position: "fixed",
     top: 0,
     left: 0,
-    right: 0,
-    bottom: 0,
+    width: "100vw",
+    height: "100vh",
     backgroundColor: "rgba(0,0,0,0.35)",
     zIndex: 1,
+  },
+  hiker: {
+    position: "fixed",
+    width: "80px",
+    height: "80px",
+    transform: "translate(-50%, 0)",
+    transition: "left 1s ease-in-out, bottom 1s ease-in-out",
+    zIndex: 2, // above background, behind quiz
+    opacity: 0.95,
   },
   homeButton: {
     position: "fixed",
@@ -257,20 +287,20 @@ const styles = {
     background: "rgba(0,0,0,0.4)",
     padding: "0.6rem 1rem",
     borderRadius: "8px",
-    zIndex: 3,
+    zIndex: 4,
     fontSize: "clamp(0.8rem, 2.5vw, 1rem)",
   },
   content: {
     position: "relative",
-    zIndex: 2,
+    zIndex: 3,
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
     width: "90%",
     maxWidth: "700px",
+    margin: "0 auto",
     padding: "2rem 1rem 4rem 1rem",
-    boxSizing: "border-box",
     textAlign: "center",
   },
   title: {
