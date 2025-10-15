@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Confetti from "react-confetti";
+import mountainImage from "../assets/mountain.jpg"; // ✅ local image
 
 export default function Quiz({ sheetId, title }) {
   const [questions, setQuestions] = useState([]);
@@ -23,326 +24,258 @@ export default function Quiz({ sheetId, title }) {
     return shuffled;
   };
 
-  // --- Fetch and randomize questions ---
+  // --- Fetch questions from Google Sheet ---
   useEffect(() => {
     fetch(SHEET_URL)
       .then((res) => res.text())
       .then((text) => {
-        const json = JSON.parse(text.substring(47).slice(0, -2));
-        const rows = json.table.rows.map((r) => ({
-          text: r.c[0]?.v,
-          options: [r.c[1]?.v, r.c[2]?.v, r.c[3]?.v, r.c[4]?.v],
-          correct: r.c[5]?.v,
-          explanation: r.c[6]?.v || "",
-        }));
-
-        const randomizedQuestions = shuffleArray(
-          rows.map((q) => ({
-            ...q,
-            options: shuffleArray(q.options),
-          }))
+        const json = JSON.parse(text.substr(47).slice(0, -2));
+        const rows = json.table.rows.map((r) =>
+          r.c.map((cell) => (cell ? cell.v : ""))
         );
-
-        setQuestions(randomizedQuestions);
+        const formatted = rows.map(([question, optA, optB, optC, optD, correct]) => ({
+          question,
+          options: shuffleArray([optA, optB, optC, optD]),
+          correct,
+        }));
+        setQuestions(formatted);
         setLoading(false);
       })
-      .catch((err) => console.error("Error fetching sheet:", err));
+      .catch((err) => console.error("Error loading sheet:", err));
   }, [SHEET_URL]);
 
-  // --- Show confetti if >80% correct ---
-  useEffect(() => {
-    if (Object.keys(submittedAnswers).length === questions.length && questions.length > 0) {
-      const percent = (score / questions.length) * 100;
-      if (percent > 80) {
-        setShowConfetti(true);
-        const timer = setTimeout(() => setShowConfetti(false), 6000);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [score, questions.length, submittedAnswers]);
-
-  if (loading)
-    return <p style={{ textAlign: "center", marginTop: "3rem" }}>Loading questions...</p>;
-  if (questions.length === 0) return <p>No questions found.</p>;
-
-  const current = questions[currentIndex];
-  const quizDone = Object.keys(submittedAnswers).length === questions.length;
-  const selected = selectedAnswers[currentIndex];
-  const submitted = submittedAnswers[currentIndex];
-  const totalQuestions = questions.length;
-
-  const handleSelect = (option) => {
-    if (!submitted) {
-      setSelectedAnswers({ ...selectedAnswers, [currentIndex]: option });
-    }
+  const handleSelect = (answer) => {
+    setSelectedAnswers({ ...selectedAnswers, [currentIndex]: answer });
   };
 
   const handleSubmit = () => {
-    if (selected && !submitted) {
-      const isCorrect = selected === current.correct;
-      setSubmittedAnswers({ ...submittedAnswers, [currentIndex]: true });
-      if (isCorrect) setScore((s) => s + 1);
+    const currentQuestion = questions[currentIndex];
+    const selected = selectedAnswers[currentIndex];
+    if (!selected) return;
+
+    const isCorrect = selected === currentQuestion.correct;
+    const updated = { ...submittedAnswers, [currentIndex]: selected };
+    setSubmittedAnswers(updated);
+    setScore((prev) => prev + (isCorrect ? 1 : 0));
+
+    if (currentIndex + 1 < questions.length) {
+      setCurrentIndex(currentIndex + 1);
+    } else {
+      setShowConfetti(true);
     }
   };
 
-  const handleNext = () => {
-    if (currentIndex < questions.length - 1) {
-      setCurrentIndex((i) => i + 1);
-    }
-  };
+  if (loading) return <p style={{ color: "white" }}>Loading questions...</p>;
 
-  const handlePrevious = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex((i) => i - 1);
-    }
-  };
+  const current = questions[currentIndex];
+  const total = questions.length;
 
   return (
     <div style={styles.container}>
-      {showConfetti && <Confetti recycle={false} numberOfPieces={300} />}
+      {/* Background and overlay */}
+      <div
+        style={{
+          ...styles.background,
+          backgroundImage: `url(${mountainImage})`,
+        }}
+      />
+      <div style={styles.overlay} />
 
-      {/* --- Header --- */}
-      <div style={styles.header}>
-        <div style={styles.sideColumn}>
-          <Link to="/" style={styles.homeLink}>
-            🏠 Home
-          </Link>
-        </div>
-        <div style={styles.centerColumn}>
-          <h2 style={styles.title}>{title}</h2>
-        </div>
-        <div style={styles.sideColumn}>{/* Empty for symmetry */}</div>
-      </div>
+      {/* Fixed Home Button */}
+      <Link to="/" style={styles.homeButton}>
+        ⬅ Home
+      </Link>
 
-      {!quizDone ? (
-        <>
-          <p style={styles.score}>
-            Score: <strong>{score}</strong> / {totalQuestions}
-          </p>
+      <div style={styles.content}>
+        {showConfetti && <Confetti />}
+        <h1 style={styles.title}>{title}</h1>
 
-          <h3 style={styles.questionHeader}>
-            Question {currentIndex + 1} of {totalQuestions}
-          </h3>
-          <p style={styles.text}>{current.text}</p>
-
-          <div style={styles.options}>
-            {current.options.map((option) => (
-              <button
-                key={option}
-                onClick={() => handleSelect(option)}
-                disabled={submitted}
-                style={{
-                  ...styles.button,
-                  backgroundColor:
-                    selected === option
-                      ? submitted
-                        ? option === current.correct
-                          ? "#4CAF50"
-                          : "#f44336"
-                        : "#2196F3"
-                      : "#eee",
-                  color: selected === option ? "white" : "black",
-                }}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-
-          {/* Navigation & Submit */}
-          <div style={styles.navButtons}>
-            <button
-              onClick={handlePrevious}
-              disabled={currentIndex === 0}
-              style={{
-                ...styles.nav,
-                opacity: currentIndex === 0 ? 0.6 : 1,
-              }}
-            >
-              ⬅️ Previous
+        {!showConfetti ? (
+          <div style={styles.quizBox}>
+            <h2 style={styles.question}>{current.question}</h2>
+            <div style={styles.optionsContainer}>
+              {current.options.map((opt, i) => (
+                <button
+                  key={i}
+                  style={{
+                    ...styles.optionButton,
+                    backgroundColor:
+                      selectedAnswers[currentIndex] === opt
+                        ? "rgba(255,255,255,0.25)"
+                        : "rgba(255,255,255,0.1)",
+                  }}
+                  onClick={() => handleSelect(opt)}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+            <button style={styles.submitButton} onClick={handleSubmit}>
+              {currentIndex + 1 === total ? "Finish Quiz" : "Next"}
             </button>
-
-            {!submitted ? (
-              <button
-                onClick={handleSubmit}
-                disabled={!selected}
-                style={{
-                  ...styles.submit,
-                  opacity: !selected ? 0.6 : 1,
-                }}
-              >
-                Submit
-              </button>
-            ) : (
-              <button
-                onClick={handleNext}
-                disabled={currentIndex === questions.length - 1}
-                style={{
-                  ...styles.next,
-                  opacity: currentIndex === questions.length - 1 ? 0.6 : 1,
-                }}
-              >
-                Next ➡️
-              </button>
-            )}
+            <p style={styles.progress}>
+              Question {currentIndex + 1} / {total}
+            </p>
           </div>
-
-          {submitted && (
-            <>
-              <p style={styles.feedback}>
-                {selected === current.correct
-                  ? "✅ Correct!"
-                  : `❌ Incorrect. The correct answer was ${current.correct}.`}
-              </p>
-              {current.explanation && (
-                <p style={styles.explanation}>💡 {current.explanation}</p>
-              )}
-            </>
-          )}
-        </>
-      ) : (
-        <div style={styles.complete}>
-          <h2>🎉 Quiz Complete!</h2>
-          <p>
-            You scored <strong>{score}</strong> out of {totalQuestions}.
-          </p>
-          <Link to="/" style={styles.returnHome}>
-            🏠 Return to Home
-          </Link>
-        </div>
-      )}
+        ) : (
+          <div style={styles.results}>
+            <h2>Quiz Complete! 🎉</h2>
+            <p>
+              Your score: {score} / {total} (
+              {Math.round((score / total) * 100)}%)
+            </p>
+            <Link to="/" style={styles.restartButton}>
+              Back to Home
+            </Link>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// --- Styles ---
 const styles = {
+  // --- Overall container ---
   container: {
+    position: "relative",
     display: "flex",
-    flexDirection: "column",
+    justifyContent: "center",
     alignItems: "center",
     minHeight: "100vh",
     width: "100%",
-    textAlign: "center",
+    overflowX: "hidden",
     fontFamily: "sans-serif",
-    backgroundColor: "#f9f9f9",
+    color: "#fff",
+    textShadow: "0 1px 3px rgba(0,0,0,0.7)",
+  },
+
+  // --- Background + overlay ---
+  background: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    backgroundAttachment: "fixed",
+    zIndex: 0,
+  },
+  overlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.35)", // adjustable for transparency
+    zIndex: 1,
+  },
+
+  // --- Content centering ---
+  content: {
+    position: "relative",
+    zIndex: 2,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "90%",
+    maxWidth: "700px",
     padding: "2rem 1rem 4rem 1rem",
     boxSizing: "border-box",
+    textAlign: "center",
   },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    width: "100%",
-    maxWidth: "800px",
-    marginBottom: "1.5rem",
-  },
-  sideColumn: {
-    flex: "1 1 100px",
-    display: "flex",
-    justifyContent: "flex-start",
-  },
-  centerColumn: {
-    flex: "2 1 100%",
-    display: "flex",
-    justifyContent: "center",
-  },
-  homeLink: {
-    backgroundColor: "#ddd",
-    color: "black",
+
+  // --- Fixed home button (always top left) ---
+  homeButton: {
+    position: "fixed",
+    top: "1rem",
+    left: "1rem",
     textDecoration: "none",
-    padding: "0.4rem 0.8rem",
-    borderRadius: "6px",
-    fontSize: "0.95rem",
-    fontWeight: "500",
+    color: "#fff",
+    fontWeight: "bold",
+    background: "rgba(0,0,0,0.4)",
+    padding: "0.6rem 1rem",
+    borderRadius: "8px",
+    zIndex: 3,
+    fontSize: "clamp(0.8rem, 2.5vw, 1rem)",
+    transition: "background 0.3s",
   },
+
+  // --- Title ---
   title: {
-    margin: 0,
-    fontSize: "1.8rem",
-    fontWeight: "600",
+    marginBottom: "1rem",
+    fontSize: "clamp(1.5rem, 5vw, 2.5rem)",
+    lineHeight: 1.2,
   },
-  score: { marginBottom: "1.5rem", fontSize: "1.1rem" },
-  questionHeader: { marginBottom: "0.5rem" },
-  text: { fontSize: "1.2rem", marginBottom: "1.5rem", maxWidth: "600px" },
-  options: {
+
+  // --- Quiz box centered ---
+  quizBox: {
+    background: "rgba(0, 0, 0, 0.55)",
+    borderRadius: "12px",
+    padding: "clamp(1rem, 4vw, 2rem)",
+    width: "100%",
+    maxWidth: "600px",
+    boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
+  },
+
+  question: {
+    fontSize: "clamp(1rem, 4vw, 1.3rem)",
+    marginBottom: "1rem",
+  },
+
+  optionsContainer: {
     display: "flex",
     flexDirection: "column",
     gap: "0.75rem",
-    width: "100%",
-    maxWidth: "400px",
   },
-  button: {
-    padding: "0.75rem",
+
+  optionButton: {
     border: "none",
     borderRadius: "8px",
-    fontSize: "1rem",
+    padding: "clamp(0.75rem, 2.5vw, 1rem)",
+    color: "#fff",
+    backgroundColor: "rgba(255,255,255,0.1)",
     cursor: "pointer",
-    transition: "0.2s ease",
+    transition: "background 0.3s, transform 0.1s",
+    fontSize: "clamp(0.9rem, 3vw, 1rem)",
   },
-  navButtons: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "1rem",
-    marginTop: "1.5rem",
-    maxWidth: "400px",
-    width: "100%",
-  },
-  nav: {
-    backgroundColor: "#9E9E9E",
-    color: "white",
-    border: "none",
-    padding: "0.75rem 2rem",
-    borderRadius: "8px",
-    fontSize: "1rem",
-    cursor: "pointer",
-  },
-  submit: {
-    backgroundColor: "#4CAF50",
-    color: "white",
-    border: "none",
-    padding: "0.75rem 2rem",
-    borderRadius: "8px",
-    fontSize: "1rem",
-    cursor: "pointer",
-    transition: "background-color 0.2s ease",
-  },
-  next: {
-    backgroundColor: "#FF9800",
-    color: "white",
-    border: "none",
-    padding: "0.75rem 2rem",
-    borderRadius: "8px",
-    fontSize: "1rem",
-    cursor: "pointer",
-  },
-  feedback: { marginTop: "1rem", fontSize: "1.1rem" },
-  explanation: {
-    marginTop: "0.75rem",
-    fontSize: "1rem",
-    maxWidth: "400px",
-    backgroundColor: "#fff8e1",
-    border: "1px solid #ffecb3",
-    borderRadius: "8px",
-    padding: "0.75rem",
-  },
-  complete: {
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "center",
-    width: "100%",
-    height: "100vh",
-    backgroundColor: "#e8f5e9",
-    textAlign: "center",
-    padding: "2rem",
-  },
-  returnHome: {
+
+  submitButton: {
     marginTop: "1.5rem",
     backgroundColor: "#4CAF50",
+    border: "none",
     color: "white",
+    padding: "clamp(0.75rem, 2.5vw, 1rem) 1.5rem",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontWeight: "bold",
+    transition: "background-color 0.3s",
+    fontSize: "clamp(0.9rem, 3vw, 1rem)",
+  },
+
+  progress: {
+    marginTop: "1rem",
+    fontSize: "clamp(0.85rem, 3vw, 1rem)",
+  },
+
+  results: {
+    background: "rgba(0,0,0,0.5)",
+    borderRadius: "12px",
+    padding: "clamp(1rem, 4vw, 2rem)",
+    maxWidth: "600px",
+    margin: "0 auto",
+  },
+
+  restartButton: {
+    display: "inline-block",
+    marginTop: "1.5rem",
+    backgroundColor: "#4CAF50",
+    color: "#fff",
+    padding: "clamp(0.75rem, 2.5vw, 1rem) 1.5rem",
+    borderRadius: "8px",
     textDecoration: "none",
-    padding: "0.75rem 2rem",
-    borderRadius: "8px",
-    fontSize: "1rem",
+    fontWeight: "bold",
+    fontSize: "clamp(0.9rem, 3vw, 1rem)",
   },
 };
