@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Confetti from "react-confetti";
 import mountainImage from "../assets/mountain.jpg";
-import hikerImage from "../assets/hiker.png"; // ✅ hiker image
+import mountainImage2 from "../assets/mountain2.jpg";
+import hikerImage from "../assets/hiker.png";
 
 export default function Quiz({ sheetId, title }) {
   const [questions, setQuestions] = useState([]);
@@ -13,11 +14,15 @@ export default function Quiz({ sheetId, title }) {
   const [score, setScore] = useState(0);
   const [showResults, setShowResults] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [progressFraction, setProgressFraction] = useState(0); // controls hiker movement
+  const [progressFraction, setProgressFraction] = useState(0);
+  const [youDied, setYouDied] = useState(false);
+  const [fadeOut, setFadeOut] = useState(false);
+  const [wrongStreak, setWrongStreak] = useState(0);
+  const [bgIndex, setBgIndex] = useState(1); // 1 = mountain1, 2 = mountain2
 
   const SHEET_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
 
-  // --- Fetch questions ---
+  // --- Fetch and prepare questions ---
   useEffect(() => {
     fetch(SHEET_URL)
       .then((res) => res.text())
@@ -26,7 +31,8 @@ export default function Quiz({ sheetId, title }) {
         const rows = json.table.rows.map((r) =>
           r.c.map((cell) => (cell ? cell.v : ""))
         );
-        const formatted = rows.map(
+
+        let formatted = rows.map(
           ([question, optA, optB, optC, optD, correct, explanation]) => ({
             question,
             options: shuffleArray([optA, optB, optC, optD]),
@@ -34,6 +40,8 @@ export default function Quiz({ sheetId, title }) {
             explanation,
           })
         );
+
+        formatted = shuffleArray(formatted).slice(0, 20); // 🆕 Limit to 20 questions
         setQuestions(formatted);
         setLoading(false);
       })
@@ -56,11 +64,13 @@ export default function Quiz({ sheetId, title }) {
   const selected = selectedAnswers[currentIndex];
   const submitted = submittedAnswers[currentIndex];
 
-  // --- Handle select and submit ---
+  // --- Handle answer selection ---
   const handleSelect = (answer) => {
-    if (!submitted) setSelectedAnswers({ ...selectedAnswers, [currentIndex]: answer });
+    if (!submitted)
+      setSelectedAnswers({ ...selectedAnswers, [currentIndex]: answer });
   };
 
+  // --- Handle answer submission ---
   const handleSubmitAnswer = () => {
     if (!selected) return;
     const isCorrect = selected === current.correct;
@@ -71,52 +81,105 @@ export default function Quiz({ sheetId, title }) {
         [currentIndex]: { selected, isCorrect },
       });
 
-      // ✅ Move hiker after submission (only if correct)
       if (isCorrect) {
         const newScore = score + 1;
         setScore(newScore);
-        setTimeout(() => {
-          setProgressFraction(newScore / total);
-        }, 400);
+        setWrongStreak(0);
+
+        // 🆕 Update progress based on 10-question stage
+        const progressInStage =
+          (currentIndex % 10 === 9 ? 1 : (currentIndex % 10 + 1) / 10);
+        setTimeout(() => setProgressFraction(progressInStage), 400);
+      } else {
+        const newStreak = wrongStreak + 1;
+        setWrongStreak(newStreak);
+
+        // 🆕 Death trigger after 3 consecutive wrongs
+        if (newStreak >= 3) {
+          setFadeOut(true);
+          setTimeout(() => setYouDied(true), 1000);
+          return;
+        }
       }
     }
   };
 
+  // --- Navigation ---
   const handleNext = () => {
-    if (currentIndex < total - 1) setCurrentIndex(currentIndex + 1);
+    if (currentIndex < total - 1) {
+      const newIndex = currentIndex + 1;
+      setCurrentIndex(newIndex);
+
+      // 🆕 Switch background + reset progress after Q10
+      if (newIndex === 10) {
+        setBgIndex(2);
+        setProgressFraction(0);
+      }
+    }
   };
+
   const handlePrev = () => {
     if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
   };
+
   const handleFinish = () => {
     const percent = (score / total) * 100;
     if (percent >= 80) setShowConfetti(true);
     setShowResults(true);
   };
 
-  // --- Hiker movement ---
-  // Start: bottom-left (x = small offset, y = small offset)
-  // End: horizontally centered, slightly below top (fully visible)
-  const startX = 5; // % from left edge
-  const endX = 50; // % (center)
-  const startY = 5; // % from bottom edge
-  const endY = 85; // % up from bottom (top area but still visible)
+  // --- Hiker position ---
+  const startX = 5;
+  const endX = 50;
+  const startY = 5;
+  const endY = 85;
 
   const hikerX = startX + (endX - startX) * progressFraction;
   const hikerY = startY + (endY - startY) * progressFraction;
 
+  const backgroundImg = bgIndex === 1 ? mountainImage : mountainImage2;
+
+  // --- “You Died” screen ---
+  if (youDied) {
+    return (
+      <div style={styles.container}>
+        <div
+          style={{
+            ...styles.background,
+            backgroundImage: `url(${backgroundImg})`,
+          }}
+        />
+        <div style={styles.overlay} />
+        <Link to="/" style={styles.homeButton}>
+          ⬅ Home
+        </Link>
+
+        <div style={styles.deathScreen}>
+          <h1 style={{ color: "red", fontSize: "3rem" }}>💀 You Died</h1>
+          <p style={{ fontSize: "1.3rem" }}>
+            You answered 3 questions incorrectly in a row.
+          </p>
+          <Link to="/" style={styles.homeReturnButton}>
+            Try Again
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.container}>
-      {/* Fixed background */}
+      {/* Background */}
       <div
         style={{
           ...styles.background,
-          backgroundImage: `url(${mountainImage})`,
+          backgroundImage: `url(${backgroundImg})`,
         }}
       />
       <div style={styles.overlay} />
+      {fadeOut && <div style={styles.fadeOutOverlay} />}
 
-      {/* ✅ Hiker (fixed to screen, always fully visible) */}
+      {/* Hiker */}
       <img
         src={hikerImage}
         alt="hiker"
@@ -127,12 +190,12 @@ export default function Quiz({ sheetId, title }) {
         }}
       />
 
-      {/* Fixed Home Button */}
+      {/* Home Button */}
       <Link to="/" style={styles.homeButton}>
         ⬅ Home
       </Link>
 
-      {/* Foreground Quiz */}
+      {/* Quiz Content */}
       <div style={styles.content}>
         {showConfetti && <Confetti />}
         <h1 style={styles.title}>{title}</h1>
@@ -141,7 +204,8 @@ export default function Quiz({ sheetId, title }) {
           <div style={styles.results}>
             <h2>Quiz Complete 🎉</h2>
             <p>
-              Your score: {score} / {total} ({Math.round((score / total) * 100)}%)
+              Your score: {score} / {total} (
+              {Math.round((score / total) * 100)}%)
             </p>
             <Link to="/" style={styles.homeReturnButton}>
               Back to Home
@@ -157,18 +221,18 @@ export default function Quiz({ sheetId, title }) {
                 const isCorrectAnswer = current.correct === opt;
                 const isSubmitted = !!submitted;
                 let background = "rgba(255,255,255,0.1)";
-
                 if (isSubmitted) {
                   if (isCorrectAnswer) background = "rgba(76, 175, 80, 0.4)";
                   else if (isSelected) background = "rgba(244, 67, 54, 0.4)";
-                } else if (isSelected) {
+                } else if (isSelected)
                   background = "rgba(255,255,255,0.25)";
-                }
-
                 return (
                   <button
                     key={i}
-                    style={{ ...styles.optionButton, backgroundColor: background }}
+                    style={{
+                      ...styles.optionButton,
+                      backgroundColor: background,
+                    }}
                     onClick={() => handleSelect(opt)}
                     disabled={isSubmitted}
                   >
@@ -178,7 +242,7 @@ export default function Quiz({ sheetId, title }) {
               })}
             </div>
 
-            {/* Navigation Buttons */}
+            {/* Navigation */}
             <div style={styles.navButtons}>
               <button
                 style={{
@@ -258,6 +322,7 @@ const styles = {
     backgroundSize: "cover",
     backgroundPosition: "center",
     zIndex: 0,
+    transition: "background-image 1.5s ease-in-out",
   },
   overlay: {
     position: "fixed",
@@ -268,13 +333,24 @@ const styles = {
     backgroundColor: "rgba(0,0,0,0.35)",
     zIndex: 1,
   },
+  fadeOutOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "black",
+    opacity: 0,
+    zIndex: 5,
+    animation: "fadeOut 1s forwards",
+  },
   hiker: {
     position: "fixed",
     width: "80px",
     height: "80px",
     transform: "translate(-50%, 0)",
     transition: "left 1s ease-in-out, bottom 1s ease-in-out",
-    zIndex: 2, // above background, behind quiz
+    zIndex: 2,
     opacity: 0.95,
   },
   homeButton: {
@@ -303,10 +379,7 @@ const styles = {
     padding: "2rem 1rem 4rem 1rem",
     textAlign: "center",
   },
-  title: {
-    marginBottom: "1rem",
-    fontSize: "clamp(1.5rem, 5vw, 2.5rem)",
-  },
+  title: { marginBottom: "1rem", fontSize: "clamp(1.5rem, 5vw, 2.5rem)" },
   quizBox: {
     background: "rgba(0, 0, 0, 0.55)",
     borderRadius: "12px",
@@ -370,19 +443,20 @@ const styles = {
     backgroundColor: "rgba(255,255,255,0.1)",
     padding: "1rem",
     borderRadius: "8px",
-    fontSize: "clamp(0.9rem, 3vw, 1rem)",
   },
-  progress: {
-    marginTop: "1rem",
-    fontSize: "clamp(0.85rem, 3vw, 1rem)",
-  },
+  progress: { marginTop: "1rem", fontSize: "clamp(0.85rem, 3vw, 1rem)" },
   results: {
     background: "rgba(0,0,0,0.5)",
     borderRadius: "12px",
     padding: "clamp(1rem, 4vw, 2rem)",
     width: "100%",
     maxWidth: "700px",
-    boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
+  },
+  deathScreen: {
+    zIndex: 3,
+    position: "relative",
+    textAlign: "center",
+    marginTop: "30vh",
   },
   homeReturnButton: {
     display: "inline-block",
@@ -393,6 +467,5 @@ const styles = {
     borderRadius: "8px",
     textDecoration: "none",
     fontWeight: "bold",
-    fontSize: "clamp(0.9rem, 3vw, 1rem)",
   },
 };
