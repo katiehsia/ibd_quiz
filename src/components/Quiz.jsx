@@ -9,8 +9,11 @@ import hikerImage from "../assets/hiker.png";
 import { commonStyles as styles } from "./commonStyles";
 
 export default function Quiz({ sheetId, title, matchingSheetId }) {
-  const mountainImages = [mountainImage, mountainImage2]; // ⛰️ add more here if desired
+  const mountainImages = [mountainImage, mountainImage2];
   const numMountains = mountainImages.length;
+
+  // ✅ Control when matching quiz appears (after N correct answers)
+  const matchingTriggerCount = 3; // ← Change this number to whatever threshold you want
 
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +28,7 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
   const [youDied, setYouDied] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [bgIndex, setBgIndex] = useState(0); // 0-based for mountains
+  const [bgIndex, setBgIndex] = useState(0);
   const [hikerPos, setHikerPos] = useState({ bottom: "0%", left: "20%" });
 
   const SHEET_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
@@ -70,27 +73,23 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
   const selected = selectedAnswers[currentIndex];
   const submitted = submittedAnswers[currentIndex];
 
-  // --- Helper: Update hiker position ---
+  // --- Hiker movement ---
   const updateHikerPosition = (totalCorrect) => {
-    const segmentSize = total / numMountains; // e.g., 10 questions per mountain
-    const mountainStage = Math.floor((totalCorrect - 1) / segmentSize); // which mountain (0-based)
-    const localCorrect = totalCorrect - mountainStage * segmentSize; // progress within current mountain
-
-    // Clamp values
+    const segmentSize = total / numMountains;
+    const mountainStage = Math.floor((totalCorrect - 1) / segmentSize);
+    const localCorrect = totalCorrect - mountainStage * segmentSize;
     const clampedMountain = Math.min(mountainStage, numMountains - 1);
     const step = Math.min(localCorrect / segmentSize, 1);
 
-    const bottomPct = 5 + step * 80; // bottom 5% → top ~85%
-    const leftPct = 20 + step * 30;  // left 20% → toward 50%
+    const bottomPct = 5 + step * 80;
+    const leftPct = 20 + step * 30;
 
-    // Update mountain background if needed
     if (clampedMountain !== bgIndex) {
       setBgIndex(clampedMountain);
       setHikerPos({ bottom: "0%", left: "20%" });
       return;
     }
 
-    // Normal incremental climb
     setHikerPos({
       bottom: `${bottomPct}%`,
       left: `${leftPct}%`,
@@ -115,10 +114,10 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
       if (isCorrect) {
         const newScore = score + 1;
         setScore(newScore);
-        setCorrectCount((c) => c + 1);
+        const newCorrectCount = correctCount + 1;
+        setCorrectCount(newCorrectCount);
         setWrongStreak(0);
-
-        updateHikerPosition(newScore); // ⛰️ move hiker
+        updateHikerPosition(newScore);
       } else {
         const newStreak = wrongStreak + 1;
         setWrongStreak(newStreak);
@@ -127,9 +126,15 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
     }
   };
 
+  // --- Handle moving to next question or showing matching quiz ---
   const handleNext = () => {
     if (currentIndex < total - 1) {
-      if (correctCount >= 2 && !matchingUsed && !showMatching) {
+      // ✅ configurable trigger for matching quiz
+      if (
+        correctCount >= matchingTriggerCount &&
+        !matchingUsed &&
+        !showMatching
+      ) {
         setShowMatching(true);
         setMatchingUsed(true);
         return;
@@ -217,7 +222,7 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
 
         <div style={styles.quizBox}>
           {showResults ? (
-            <div>
+            <div style={{ animation: "fadeIn 1s ease-in-out" }}>
               <h2>Quiz Complete 🎉</h2>
               <p>
                 Your score: {score} / {total} ({Math.round((score / total) * 100)}%)
