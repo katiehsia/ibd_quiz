@@ -222,7 +222,8 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
               <p>
                 Your score: {score} / {total} ({Math.round((score / total) * 100)}%)
               </p>
-              <Link to="/" style={styles.homeReturnButton}>
+
+              <Link to="/" style={styles.continueButton}>
                 Back to Home
               </Link>
             </div>

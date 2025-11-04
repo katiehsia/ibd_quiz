@@ -215,7 +215,7 @@ quizBox: {
     flexWrap: "wrap",
     marginTop: "1.5rem",
     width: "100%",
-    },
+  },
 
   matchingColumn: {
     flex: "1 1 45%",
