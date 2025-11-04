@@ -27,7 +27,7 @@ function Home() {
 
         {/* Post Survey */}
         <a 
-          href="https://example.com/postsurvey" 
+          href="https://google.com" 
           target="_blank" 
           rel="noopener noreferrer"
           style={styles.surveyButton}
@@ -43,7 +43,8 @@ function QuizWrapper() {
   const { moduleId } = useParams();
   const module = MODULES.find((m) => m.id === moduleId);
   if (!module) return <p>Module not found</p>;
-  return <Quiz sheetId={module.sheetId} title={module.name} />;
+  // pass matchingSheetId if present in module object
+  return <Quiz sheetId={module.sheetId} matchingSheetId={module.matchingSheetId} title={module.name} />;
 }
 
 export default function App() {
@@ -73,11 +74,11 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "1.2rem", // ✅ ensures equal spacing between all buttons
+    gap: "1.2rem",
     marginTop: "2rem",
   },
   moduleButton: {
-    backgroundColor: "#2196F3", // blue for module buttons
+    backgroundColor: "#2196F3",
     color: "white",
     textDecoration: "none",
     padding: "0.75rem 2rem",
@@ -88,7 +89,7 @@ const styles = {
     textAlign: "center",
   },
   surveyButton: {
-    backgroundColor: "#20c997", // teal for pre/post survey buttons
+    backgroundColor: "#20c997",
     color: "white",
     textDecoration: "none",
     padding: "0.75rem 2rem",

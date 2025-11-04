@@ -74,3 +74,31 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* required for fadeOut overlay animation */
+@keyframes fadeOut {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* optional: make timer flash smoother (if you want) */
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 rgba(255,0,0,0.45); }
+  50% { box-shadow: 0 0 15px rgba(255,0,0,0.85); }
+  100% { box-shadow: 0 0 0 rgba(255,0,0,0.45); }
+}
+
+// Add this CSS globally in index.css (recommended for cleaner look)
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.3);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.5);
+}
+
+
