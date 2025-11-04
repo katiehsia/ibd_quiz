@@ -5,7 +5,7 @@ import { MODULES } from "./data/modules";
 function Home() {
   return (
     <div style={styles.home}>
-      <h1>Dr. Jangi's IBD Learning Home</h1>
+      <h1>Dr. Jangi's IBD Adventure Learning</h1>
 
       <div style={styles.buttonContainer}>
         {/* Pre Survey */}

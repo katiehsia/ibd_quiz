@@ -1,4 +1,3 @@
-// src/components/Quiz.jsx
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Confetti from "react-confetti";
@@ -10,6 +9,9 @@ import hikerImage from "../assets/hiker.png";
 import { commonStyles as styles } from "./commonStyles";
 
 export default function Quiz({ sheetId, title, matchingSheetId }) {
+  const mountainImages = [mountainImage, mountainImage2]; // ⛰️ add more here if desired
+  const numMountains = mountainImages.length;
+
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -23,11 +25,12 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
   const [youDied, setYouDied] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [bgIndex, setBgIndex] = useState(1);
+  const [bgIndex, setBgIndex] = useState(0); // 0-based for mountains
+  const [hikerPos, setHikerPos] = useState({ bottom: "0%", left: "20%" });
 
   const SHEET_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
 
-  // --- Load main quiz questions ---
+  // --- Load questions ---
   useEffect(() => {
     fetch(SHEET_URL)
       .then((res) => res.text())
@@ -67,6 +70,33 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
   const selected = selectedAnswers[currentIndex];
   const submitted = submittedAnswers[currentIndex];
 
+  // --- Helper: Update hiker position ---
+  const updateHikerPosition = (totalCorrect) => {
+    const segmentSize = total / numMountains; // e.g., 10 questions per mountain
+    const mountainStage = Math.floor((totalCorrect - 1) / segmentSize); // which mountain (0-based)
+    const localCorrect = totalCorrect - mountainStage * segmentSize; // progress within current mountain
+
+    // Clamp values
+    const clampedMountain = Math.min(mountainStage, numMountains - 1);
+    const step = Math.min(localCorrect / segmentSize, 1);
+
+    const bottomPct = 5 + step * 80; // bottom 5% → top ~85%
+    const leftPct = 20 + step * 30;  // left 20% → toward 50%
+
+    // Update mountain background if needed
+    if (clampedMountain !== bgIndex) {
+      setBgIndex(clampedMountain);
+      setHikerPos({ bottom: "0%", left: "20%" });
+      return;
+    }
+
+    // Normal incremental climb
+    setHikerPos({
+      bottom: `${bottomPct}%`,
+      left: `${leftPct}%`,
+    });
+  };
+
   const handleSelect = (answer) => {
     if (!submitted)
       setSelectedAnswers({ ...selectedAnswers, [currentIndex]: answer });
@@ -83,9 +113,12 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
       });
 
       if (isCorrect) {
-        setScore((s) => s + 1);
+        const newScore = score + 1;
+        setScore(newScore);
         setCorrectCount((c) => c + 1);
         setWrongStreak(0);
+
+        updateHikerPosition(newScore); // ⛰️ move hiker
       } else {
         const newStreak = wrongStreak + 1;
         setWrongStreak(newStreak);
@@ -104,7 +137,6 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
 
       const newIndex = currentIndex + 1;
       setCurrentIndex(newIndex);
-      if (newIndex === 10) setBgIndex(2);
     }
   };
 
@@ -114,7 +146,7 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
     setShowResults(true);
   };
 
-  const backgroundImg = bgIndex === 1 ? mountainImage : mountainImage2;
+  const backgroundImg = mountainImages[Math.min(bgIndex, numMountains - 1)];
 
   // --- Matching quiz overlay ---
   if (showMatching) {
@@ -131,7 +163,7 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
     );
   }
 
-  // --- You Died ---
+  // --- You Died screen ---
   if (youDied) {
     return (
       <div style={styles.container}>
@@ -159,6 +191,22 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
         style={{ ...styles.background, backgroundImage: `url(${backgroundImg})` }}
       />
       <div style={styles.overlay} />
+
+      {/* 🧗‍♂️ Hiker */}
+      <img
+        src={hikerImage}
+        alt="Hiker"
+        style={{
+          ...styles.hiker,
+          position: "absolute",
+          bottom: hikerPos.bottom,
+          left: hikerPos.left,
+          width: "70px",
+          transition: "bottom 0.8s ease-in-out, left 0.8s ease-in-out",
+          zIndex: 3,
+        }}
+      />
+
       <Link to="/" style={styles.homeButton}>
         ⬅ Home
       </Link>
@@ -172,8 +220,7 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
             <div>
               <h2>Quiz Complete 🎉</h2>
               <p>
-                Your score: {score} / {total} (
-                {Math.round((score / total) * 100)}%)
+                Your score: {score} / {total} ({Math.round((score / total) * 100)}%)
               </p>
               <Link to="/" style={styles.homeReturnButton}>
                 Back to Home
@@ -269,4 +316,3 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
     </div>
   );
 }
-
