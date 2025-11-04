@@ -8,12 +8,14 @@ import mountainImage2 from "../assets/mountain2.jpg";
 import hikerImage from "../assets/hiker.png";
 import { commonStyles as styles } from "./commonStyles";
 
-export default function Quiz({ sheetId, title, matchingSheetId }) {
+export default function Quiz({
+  sheetId,
+  title,
+  matchingSheetIds = [], // ✅ array of sheet IDs for matching quizzes
+  matchingTriggerPoints = [3], // ✅ array of thresholds for triggering
+}) {
   const mountainImages = [mountainImage, mountainImage2];
   const numMountains = mountainImages.length;
-
-  // ✅ Control when matching quiz appears (after N correct answers)
-  const matchingTriggerCount = 3; // ← Change this number to whatever threshold you want
 
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +26,7 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongStreak, setWrongStreak] = useState(0);
   const [showMatching, setShowMatching] = useState(false);
-  const [matchingUsed, setMatchingUsed] = useState(false);
+  const [matchingCount, setMatchingCount] = useState(0); // ✅ number of completed matching quizzes
   const [youDied, setYouDied] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
@@ -33,7 +35,7 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
 
   const SHEET_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
 
-  // --- Load questions ---
+  // --- Load main quiz questions ---
   useEffect(() => {
     fetch(SHEET_URL)
       .then((res) => res.text())
@@ -113,11 +115,18 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
 
       if (isCorrect) {
         const newScore = score + 1;
-        setScore(newScore);
         const newCorrectCount = correctCount + 1;
+        setScore(newScore);
         setCorrectCount(newCorrectCount);
         setWrongStreak(0);
         updateHikerPosition(newScore);
+
+        // ✅ Check if a matching quiz should trigger
+        const nextTrigger = matchingTriggerPoints[matchingCount];
+        if (nextTrigger && newCorrectCount >= nextTrigger && !showMatching) {
+          setShowMatching(true);
+          return;
+        }
       } else {
         const newStreak = wrongStreak + 1;
         setWrongStreak(newStreak);
@@ -126,22 +135,9 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
     }
   };
 
-  // --- Handle moving to next question or showing matching quiz ---
   const handleNext = () => {
     if (currentIndex < total - 1) {
-      // ✅ configurable trigger for matching quiz
-      if (
-        correctCount >= matchingTriggerCount &&
-        !matchingUsed &&
-        !showMatching
-      ) {
-        setShowMatching(true);
-        setMatchingUsed(true);
-        return;
-      }
-
-      const newIndex = currentIndex + 1;
-      setCurrentIndex(newIndex);
+      setCurrentIndex(currentIndex + 1);
     }
   };
 
@@ -153,17 +149,23 @@ export default function Quiz({ sheetId, title, matchingSheetId }) {
 
   const backgroundImg = mountainImages[Math.min(bgIndex, numMountains - 1)];
 
-  // --- Matching quiz overlay ---
+  // --- Matching quiz overlay (multi-support) ---
   if (showMatching) {
+    // ✅ pick matching sheet ID based on current matchingCount
+    const currentSheetId =
+      matchingSheetIds[matchingCount] ||
+      matchingSheetIds[matchingSheetIds.length - 1]; // fallback to last if fewer IDs
+
     return (
       <MatchingQuiz
-        matchingSheetId={matchingSheetId}
+        matchingSheetId={currentSheetId}
         backgroundImg={backgroundImg}
         onSuccess={() => {
+          setMatchingCount((n) => n + 1);
           setShowMatching(false);
           handleNext();
         }}
-        onFail={() => setYouDied(true)} // instant death
+        onFail={() => setYouDied(true)}
       />
     );
   }

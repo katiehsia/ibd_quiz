@@ -43,8 +43,16 @@ function QuizWrapper() {
   const { moduleId } = useParams();
   const module = MODULES.find((m) => m.id === moduleId);
   if (!module) return <p>Module not found</p>;
-  // pass matchingSheetId if present in module object
-  return <Quiz sheetId={module.sheetId} matchingSheetId={module.matchingSheetId} title={module.name} />;
+
+  // ✅ Pass arrays for matching quizzes and trigger points
+  return (
+    <Quiz
+      sheetId={module.sheetId}
+      title={module.name}
+      matchingSheetIds={module.matchingSheetIds || []}
+      matchingTriggerPoints={module.matchingTriggerPoints || []}
+    />
+  );
 }
 
 export default function App() {
