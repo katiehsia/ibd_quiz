@@ -77,21 +77,30 @@ export default function Quiz({
 
   // --- Hiker movement ---
   const updateHikerPosition = (totalCorrect) => {
-    const segmentSize = total / numMountains;
+    const segmentSize = Math.ceil(total / numMountains); // questions per mountain
     const mountainStage = Math.floor((totalCorrect - 1) / segmentSize);
     const localCorrect = totalCorrect - mountainStage * segmentSize;
     const clampedMountain = Math.min(mountainStage, numMountains - 1);
+
+    // Fraction of progress within this mountain
     const step = Math.min(localCorrect / segmentSize, 1);
 
-    const bottomPct = 5 + step * 80;
-    const leftPct = 20 + step * 30;
+    // Define start (bottom-left) and end (top-center) positions
+    const start = { bottom: 5, left: 20 };
+    const end = { bottom: 85, left: 50 };
 
+    // Interpolate between start and end
+    const bottomPct = start.bottom + step * (end.bottom - start.bottom);
+    const leftPct = start.left + step * (end.left - start.left);
+
+    // When switching to a new mountain scene, reset position to start
     if (clampedMountain !== bgIndex) {
       setBgIndex(clampedMountain);
-      setHikerPos({ bottom: "0%", left: "20%" });
+      setHikerPos({ bottom: `${start.bottom}%`, left: `${start.left}%` });
       return;
     }
 
+    // Smooth transition for current scene
     setHikerPos({
       bottom: `${bottomPct}%`,
       left: `${leftPct}%`,
@@ -209,10 +218,11 @@ export default function Quiz({
           bottom: hikerPos.bottom,
           left: hikerPos.left,
           width: "70px",
-          transition: "bottom 0.8s ease-in-out, left 0.8s ease-in-out",
+          transition: "bottom 1s ease-in-out, left 1s ease-in-out",
           zIndex: 3,
         }}
       />
+
 
       <Link to="/" style={styles.homeButton}>
         ⬅ Home
