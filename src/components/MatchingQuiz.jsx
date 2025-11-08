@@ -16,7 +16,7 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
   const [survived, setSurvived] = useState(false);
   const [died, setDied] = useState(false);
   const [columnTitles, setColumnTitles] = useState(["Left", "Right"]);
-  const [touchDrag, setTouchDrag] = useState(null); // ✅ track touch drag
+  const [touchDrag, setTouchDrag] = useState(null);
   const timerRef = useRef(null);
 
   // --- Fetch matching pairs ---
@@ -117,19 +117,47 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
     attemptMatch(leftValue, rightValue);
   };
 
-  // --- Touch drag/drop for mobile ---
-  const handleTouchStart = (value, side) => {
+  // --- Mobile touch drag/drop ---
+  const handleTouchStart = (value, side, e) => {
     setTouchDrag({ value, side });
-  };
-  const handleTouchEnd = (value, side) => {
-    if (!touchDrag || touchDrag.side === side) return;
-    const leftValue = touchDrag.side === "left" ? touchDrag.value : value;
-    const rightValue = touchDrag.side === "right" ? touchDrag.value : value;
-    setTouchDrag(null);
-    attemptMatch(leftValue, rightValue);
+    e.target.style.opacity = 0.6;
   };
 
-  // --- Click-to-match fallback ---
+  const handleTouchMove = (e) => {
+    if (!touchDrag) return;
+    e.preventDefault(); // prevent scrolling
+    const touch = e.touches[0];
+    const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!elem) return;
+    const targetValue = elem.getAttribute("data-value");
+    const targetSide = elem.getAttribute("data-side");
+    if (targetValue && targetSide && targetSide !== touchDrag.side) {
+      setHovered(targetValue);
+    } else {
+      setHovered(null);
+    }
+  };
+
+  const handleTouchEnd = (e) => {
+    if (!touchDrag) return;
+    const touch = e.changedTouches[0];
+    const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+    e.target.style.opacity = 1;
+
+    if (elem) {
+      const targetValue = elem.getAttribute("data-value");
+      const targetSide = elem.getAttribute("data-side");
+      if (targetValue && targetSide && targetSide !== touchDrag.side) {
+        const leftValue = touchDrag.side === "left" ? touchDrag.value : targetValue;
+        const rightValue = touchDrag.side === "right" ? touchDrag.value : targetValue;
+        attemptMatch(leftValue, rightValue);
+      }
+    }
+    setTouchDrag(null);
+    setHovered(null);
+  };
+
+  // --- Click fallback ---
   const handleClick = (value, side) => {
     if (!selected) {
       setSelected({ value, side });
@@ -174,9 +202,7 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
       <div style={styles.container}>
         <div style={{ ...styles.background, backgroundImage: `url(${backgroundImg})` }} />
         <div style={styles.overlay} />
-        <Link to="/" style={styles.homeButton}>
-          ⬅ Home
-        </Link>
+        <Link to="/" style={styles.homeButton}>⬅ Home</Link>
         <div style={styles.content}>
           <h1 style={styles.title}>Matching Pop Quiz</h1>
           <div style={{ ...styles.quizBox, maxHeight: "85vh" }}>
@@ -194,19 +220,18 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
 
   // --- Main Matching UI ---
   return (
-    <div style={styles.container}>
+    <div
+      style={styles.container}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       <div style={{ ...styles.background, backgroundImage: `url(${backgroundImg})` }} />
       <div style={styles.overlay} />
-      <Link to="/" style={styles.homeButton}>
-        ⬅ Home
-      </Link>
+      <Link to="/" style={styles.homeButton}>⬅ Home</Link>
       <div style={styles.content}>
         <h1 style={styles.title}>Matching Pop Quiz</h1>
         <div style={{ ...styles.quizBox, maxHeight: "85vh", paddingBottom: "3rem" }}>
-          <p>
-            Match each {columnTitles[0]} with its correct {columnTitles[1]}. One mistake =
-            instant death.
-          </p>
+          <p>Match each {columnTitles[0]} with its correct {columnTitles[1]}. One mistake = instant death.</p>
           <div style={{ ...styles.timer, background: timerBg }}>⏱ {timeLeft}s</div>
 
           <div style={styles.matchingContainer}>
@@ -216,13 +241,14 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
               {leftItems.map((l) => (
                 <div
                   key={l}
+                  data-value={l}
+                  data-side="left"
                   draggable={!matchedPairs[l]}
                   onDragStart={(e) => handleDragStart(e, l, "left")}
                   onDragOver={(e) => handleDragOver(e, l)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, l, "left")}
-                  onTouchStart={() => handleTouchStart(l, "left")}
-                  onTouchEnd={() => handleTouchEnd(l, "left")}
+                  onTouchStart={(e) => handleTouchStart(l, "left", e)}
                   onClick={() => handleClick(l, "left")}
                   style={{
                     ...styles.matchingItem,
@@ -247,13 +273,14 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
               {rightItems.map((r) => (
                 <div
                   key={r}
+                  data-value={r}
+                  data-side="right"
                   draggable={!Object.values(matchedPairs).includes(r)}
                   onDragStart={(e) => handleDragStart(e, r, "right")}
                   onDragOver={(e) => handleDragOver(e, r)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, r, "right")}
-                  onTouchStart={() => handleTouchStart(r, "right")}
-                  onTouchEnd={() => handleTouchEnd(r, "right")}
+                  onTouchStart={(e) => handleTouchStart(r, "right", e)}
                   onClick={() => handleClick(r, "right")}
                   style={{
                     ...styles.matchingItem,
