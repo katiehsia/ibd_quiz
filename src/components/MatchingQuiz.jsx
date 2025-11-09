@@ -17,6 +17,7 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
   const [died, setDied] = useState(false);
   const [columnTitles, setColumnTitles] = useState(["Left", "Right"]);
   const [touchDrag, setTouchDrag] = useState(null);
+  const [dragGhost, setDragGhost] = useState(null);
   const timerRef = useRef(null);
 
   // --- Fetch matching pairs ---
@@ -117,16 +118,41 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
     attemptMatch(leftValue, rightValue);
   };
 
-  // --- Mobile touch drag/drop ---
+  // --- Mobile touch drag/drop (true drag experience) ---
   const handleTouchStart = (value, side, e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const ghost = document.createElement("div");
+    ghost.innerText = value;
+    Object.assign(ghost.style, {
+      position: "fixed",
+      top: `${touch.clientY - 20}px`,
+      left: `${touch.clientX - 60}px`,
+      padding: "6px 10px",
+      background: "rgba(255,255,255,0.8)",
+      color: "#000",
+      borderRadius: "8px",
+      boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+      zIndex: 9999,
+      pointerEvents: "none",
+      fontSize: "14px",
+      fontWeight: "600",
+    });
+    document.body.appendChild(ghost);
+    setDragGhost(ghost);
     setTouchDrag({ value, side });
-    e.target.style.opacity = 0.6;
   };
 
   const handleTouchMove = (e) => {
-    if (!touchDrag) return;
-    e.preventDefault(); // prevent scrolling
+    if (!touchDrag || !dragGhost) return;
     const touch = e.touches[0];
+    e.preventDefault();
+
+    // Move ghost
+    dragGhost.style.top = `${touch.clientY - 20}px`;
+    dragGhost.style.left = `${touch.clientX - 60}px`;
+
+    // Detect hovered element
     const elem = document.elementFromPoint(touch.clientX, touch.clientY);
     if (!elem) return;
     const targetValue = elem.getAttribute("data-value");
@@ -142,7 +168,12 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
     if (!touchDrag) return;
     const touch = e.changedTouches[0];
     const elem = document.elementFromPoint(touch.clientX, touch.clientY);
-    e.target.style.opacity = 1;
+
+    // Remove ghost
+    if (dragGhost) {
+      dragGhost.remove();
+      setDragGhost(null);
+    }
 
     if (elem) {
       const targetValue = elem.getAttribute("data-value");
@@ -153,8 +184,9 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
         attemptMatch(leftValue, rightValue);
       }
     }
-    setTouchDrag(null);
+
     setHovered(null);
+    setTouchDrag(null);
   };
 
   // --- Click fallback ---
