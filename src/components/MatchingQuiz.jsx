@@ -265,7 +265,18 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
       <Link to="/" style={styles.homeButton}>⬅ Home</Link>
       <div style={styles.content}>
         <h1 style={styles.title}>Matching Pop Quiz</h1>
-        <div style={{ ...styles.quizBox, maxHeight: "85vh", paddingBottom: "3rem" }}>
+        <div
+          style={{
+            ...styles.quizBox,
+            maxHeight: "85vh",
+            paddingBottom: "3rem",
+
+            // NEW — prevents horizontal shifting during touch drag
+            overflowX: "hidden",
+            width: "100%",
+            position: "relative",
+          }}
+        >
           <p>Match each {columnTitles[0]} with its correct {columnTitles[1]}. One mistake = instant death.</p>
           <div style={{ ...styles.timer, background: timerBg }}>⏱ {timeLeft}s</div>
 
