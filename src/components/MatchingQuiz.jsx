@@ -252,14 +252,11 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
 
   // --- Main Matching UI ---
   return (
-      <div
-        style={{ 
-          ...styles.container,
-          touchAction: "none"      // <-- prevents scrolling during drag
-        }}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
+    <div
+      style={styles.container}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       <div style={{ ...styles.background, backgroundImage: `url(${backgroundImg})` }} />
       <div style={styles.overlay} />
       <Link to="/" style={styles.homeButton}>⬅ Home</Link>
