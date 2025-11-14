@@ -17,8 +17,12 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
   const [died, setDied] = useState(false);
   const [columnTitles, setColumnTitles] = useState(["Left", "Right"]);
 <<<<<<< HEAD
+<<<<<<< HEAD
   const [touchDrag, setTouchDrag] = useState(null);
   const [dragGhost, setDragGhost] = useState(null);
+=======
+  const [touchDrag, setTouchDrag] = useState(null); // ✅ track touch drag
+>>>>>>> parent of cfbd6b8 (mobile drag and drop)
 =======
   const [touchDrag, setTouchDrag] = useState(null); // ✅ track touch drag
 >>>>>>> parent of cfbd6b8 (mobile drag and drop)
@@ -123,6 +127,7 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
   };
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   // --- Mobile touch drag/drop (true drag experience) ---
   const handleTouchStart = (value, side, e) => {
     e.preventDefault();
@@ -197,12 +202,21 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
   const handleTouchStart = (value, side) => {
     setTouchDrag({ value, side });
   };
+=======
+  // --- Touch drag/drop for mobile ---
+  const handleTouchStart = (value, side) => {
+    setTouchDrag({ value, side });
+  };
+>>>>>>> parent of cfbd6b8 (mobile drag and drop)
   const handleTouchEnd = (value, side) => {
     if (!touchDrag || touchDrag.side === side) return;
     const leftValue = touchDrag.side === "left" ? touchDrag.value : value;
     const rightValue = touchDrag.side === "right" ? touchDrag.value : value;
     setTouchDrag(null);
     attemptMatch(leftValue, rightValue);
+<<<<<<< HEAD
+>>>>>>> parent of cfbd6b8 (mobile drag and drop)
+=======
 >>>>>>> parent of cfbd6b8 (mobile drag and drop)
   };
 
@@ -280,6 +294,7 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
       <div style={styles.content}>
         <h1 style={styles.title}>Matching Pop Quiz</h1>
 <<<<<<< HEAD
+<<<<<<< HEAD
         <div
           style={{
             ...styles.quizBox,
@@ -294,11 +309,16 @@ export default function MatchingQuiz({ matchingSheetId, backgroundImg, onSuccess
         >
           <p>Match each {columnTitles[0]} with its correct {columnTitles[1]}. One mistake = instant death.</p>
 =======
+=======
+>>>>>>> parent of cfbd6b8 (mobile drag and drop)
         <div style={{ ...styles.quizBox, maxHeight: "85vh", paddingBottom: "3rem" }}>
           <p>
             Match each {columnTitles[0]} with its correct {columnTitles[1]}. One mistake =
             instant death.
           </p>
+<<<<<<< HEAD
+>>>>>>> parent of cfbd6b8 (mobile drag and drop)
+=======
 >>>>>>> parent of cfbd6b8 (mobile drag and drop)
           <div style={{ ...styles.timer, background: timerBg }}>⏱ {timeLeft}s</div>
 
