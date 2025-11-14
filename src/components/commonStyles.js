@@ -86,6 +86,9 @@ quizBox: {
   boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
   scrollbarWidth: "thin",
   scrollbarColor: "rgba(255,255,255,0.3) transparent",
+  touchAction: "none",     // 🔒 locks all swipe/pan to prevent horizontal drift
+  overflow: "hidden",      // 🔒 prevents accidental side-to-side jiggle
+
 },
 
 
@@ -209,21 +212,25 @@ quizBox: {
   // --- Matching quiz layout ---
   matchingContainer: {
     display: "flex",
-    justifyContent: "space-between",
+    justifyContent: "center",     // ⭐ centers both columns
     alignItems: "flex-start",
-    gap: "2rem",
+    gap: "1.5rem",
     flexWrap: "wrap",
     marginTop: "1.5rem",
     width: "100%",
+    maxWidth: "600px",             // ⭐ prevents over-wide columns
+    margin: "0 auto",              // ⭐ centers entire block in grey box
   },
+
 
   matchingColumn: {
     flex: "1 1 45%",
     display: "flex",
     flexDirection: "column",
     gap: "1rem",
-    alignItems: "stretch",
-    marginBottom: "2rem",   // ✅ extra safety
+    alignItems: "center",      // ⭐ centers items inside column
+    width: "50%",              // ⭐ stable width across devices
+    marginBottom: "2rem",
   },
 
   matchingItem: {
