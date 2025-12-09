@@ -10,7 +10,7 @@ function Home() {
       <div style={styles.buttonContainer}>
         {/* Pre Survey */}
         <a 
-          href="https://google.com" 
+          href="https://collaborate.tuftsctsi.org/redcap/surveys/?s=4XKEEDFCNMHH8P9X" 
           target="_blank" 
           rel="noopener noreferrer"
           style={styles.surveyButton}
@@ -27,7 +27,7 @@ function Home() {
 
         {/* Post Survey */}
         <a 
-          href="https://google.com" 
+          href="https://collaborate.tuftsctsi.org/redcap/surveys/?s=Y8FAJ4T3YH474T7K" 
           target="_blank" 
           rel="noopener noreferrer"
           style={styles.surveyButton}
